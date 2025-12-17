@@ -6,8 +6,7 @@ Dataset: gpu_data_processed.csv (preprocessed GPU dataset)
 
 Level: SKILLED (3 poin)
 - Menggunakan MLflow autolog untuk mencatat parameter, metrik, dan model
-- Compatible dengan GitHub Actions CI workflow
-- Model artifacts disimpan untuk upload ke GitHub Artifacts
+- Compatible dengan GitHub Actions CI workflow via mlflow run
 """
 
 import os
@@ -21,15 +20,15 @@ import mlflow.sklearn
 # ============================================
 # 1. Konfigurasi MLflow Tracking
 # ============================================
-# Gunakan environment variable jika tersedia, untuk CI compatibility
-tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", None)
+# Menggunakan tracking URI dari environment variable jika tersedia
+# Jika tidak, gunakan default localhost untuk development lokal
+tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 if tracking_uri:
-    mlflow.set_tracking_uri(tracking_uri)
-    print(f"Using MLflow Tracking URI: {tracking_uri}")
+    print(f"Using MLflow Tracking URI from environment: {tracking_uri}")
 else:
-    # Default: local mlruns folder
-    mlflow.set_tracking_uri("file:./mlruns")
-    print("Using local mlruns folder for tracking")
+    # Default untuk local development
+    mlflow.set_tracking_uri("http://127.0.0.1:5000")
+    print("Using default MLflow Tracking URI: http://127.0.0.1:5000")
 
 mlflow.set_experiment("GPU_Classification_CI")
 
@@ -37,19 +36,13 @@ mlflow.set_experiment("GPU_Classification_CI")
 # 2. Load Dataset Preprocessing
 # ============================================
 print("Loading preprocessed dataset...")
-# Support running from different directories
-script_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(script_dir, "gpu_data_processed.csv")
-df = pd.read_csv(data_path)
+df = pd.read_csv("gpu_data_processed.csv")
 print(f"Dataset shape: {df.shape}")
 print(f"Columns: {df.columns.tolist()}")
 
 # ============================================
 # 3. Menentukan Fitur dan Target
 # ============================================
-# Target: manufacturer_encoded (klasifikasi manufacturer GPU)
-# Fitur: semua kolom numerik kecuali target dan productName
-
 target_column = "manufacturer_encoded"
 exclude_columns = ["productName", target_column]
 
@@ -84,7 +77,7 @@ print("="*50)
 mlflow.sklearn.autolog(log_models=True)
 
 # Training model dengan autolog
-with mlflow.start_run(run_name="RandomForest_CI_Training"):
+with mlflow.start_run(run_name="RandomForest_Autolog"):
     # Buat dan latih model
     model = RandomForestClassifier(
         n_estimators=100,
@@ -103,13 +96,6 @@ with mlflow.start_run(run_name="RandomForest_CI_Training"):
     print(f"\nTraining Accuracy: {train_score:.4f}")
     print(f"Test Accuracy: {test_score:.4f}")
     
-    # Log tambahan manual
-    mlflow.log_param("dataset_name", "gpu_data_processed.csv")
-    mlflow.log_param("target_column", target_column)
-    mlflow.log_param("n_features", len(feature_columns))
-    mlflow.log_param("n_train_samples", X_train.shape[0])
-    mlflow.log_param("n_test_samples", X_test.shape[0])
-    
     # Log run info
     run_id = mlflow.active_run().info.run_id
     print(f"\nMLflow Run ID: {run_id}")
@@ -118,4 +104,3 @@ with mlflow.start_run(run_name="RandomForest_CI_Training"):
     print("MLflow Autolog Training Complete!")
     print("="*50)
     print("\nSemua parameter, metrik, dan model telah disimpan ke MLflow.")
-    print(f"Artifacts tersimpan di folder mlruns/")

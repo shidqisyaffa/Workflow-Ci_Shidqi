@@ -46,18 +46,18 @@ jobs:
       # Tahap 6: Set MLflow Tracking URI
       - name: Set MLflow Tracking URI
         run: |
-          mkdir -p ${{ github.workspace }}/mlruns
+          echo "Setting up MLflow tracking..."
           echo "MLFLOW_TRACKING_URI=${{ github.workspace }}/mlruns" >> $GITHUB_ENV
-          echo "MLflow Tracking URI set to: ${{ github.workspace }}/mlruns"
+          echo "MLflow Tracking URI: ${{ github.workspace }}/mlruns"
       
       # Tahap 7: Run MLflow Project
       - name: Run MLflow Project
-        working-directory: MLProject
         env:
           MLFLOW_TRACKING_URI: ${{ github.workspace }}/mlruns
         run: |
           echo "=== Starting MLflow Project Training ==="
-          python modelling.py
+          echo "MLFLOW_TRACKING_URI=$MLFLOW_TRACKING_URI"
+          mlflow run MLProject --env-manager=local
           echo "=== MLflow Project Training Complete ==="
       
       # Tahap 8: Get latest MLflow run_id
@@ -102,4 +102,3 @@ jobs:
           if-no-files-found: warn
 
       # Post step: Complete job (otomatis oleh GitHub Actions)
-# Trigger CI
