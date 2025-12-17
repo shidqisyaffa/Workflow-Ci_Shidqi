@@ -7,6 +7,7 @@ Dataset: gpu_data_processed.csv (preprocessed GPU dataset)
 Level: SKILLED (3 poin)
 - Menggunakan MLflow autolog untuk mencatat parameter, metrik, dan model
 - Compatible dengan GitHub Actions CI workflow via mlflow run
+- PENTING: Tidak menggunakan mlflow.start_run() karena mlflow run sudah membuat run
 """
 
 import os
@@ -20,17 +21,11 @@ import mlflow.sklearn
 # ============================================
 # 1. Konfigurasi MLflow Tracking
 # ============================================
-# Menggunakan tracking URI dari environment variable jika tersedia
-# Jika tidak, gunakan default localhost untuk development lokal
 tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
 if tracking_uri:
     print(f"Using MLflow Tracking URI from environment: {tracking_uri}")
 else:
-    # Default untuk local development
-    mlflow.set_tracking_uri("http://127.0.0.1:5000")
-    print("Using default MLflow Tracking URI: http://127.0.0.1:5000")
-
-mlflow.set_experiment("GPU_Classification_CI")
+    print("No MLFLOW_TRACKING_URI set, using default")
 
 # ============================================
 # 2. Load Dataset Preprocessing
@@ -76,31 +71,33 @@ print("="*50)
 # Aktifkan MLflow autolog untuk sklearn
 mlflow.sklearn.autolog(log_models=True)
 
-# Training model dengan autolog
-with mlflow.start_run(run_name="RandomForest_Autolog"):
-    # Buat dan latih model
-    model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=10,
-        random_state=42,
-        n_jobs=-1
-    )
-    
-    print("Training RandomForestClassifier...")
-    model.fit(X_train, y_train)
-    
-    # Evaluasi
-    train_score = model.score(X_train, y_train)
-    test_score = model.score(X_test, y_test)
-    
-    print(f"\nTraining Accuracy: {train_score:.4f}")
-    print(f"Test Accuracy: {test_score:.4f}")
-    
-    # Log run info
-    run_id = mlflow.active_run().info.run_id
-    print(f"\nMLflow Run ID: {run_id}")
-    
-    print("\n" + "="*50)
-    print("MLflow Autolog Training Complete!")
-    print("="*50)
-    print("\nSemua parameter, metrik, dan model telah disimpan ke MLflow.")
+# Training model - TIDAK menggunakan mlflow.start_run()
+# karena mlflow run sudah membuat run secara otomatis
+model = RandomForestClassifier(
+    n_estimators=100,
+    max_depth=10,
+    random_state=42,
+    n_jobs=-1
+)
+
+print("Training RandomForestClassifier...")
+model.fit(X_train, y_train)
+
+# Evaluasi
+train_score = model.score(X_train, y_train)
+test_score = model.score(X_test, y_test)
+
+print(f"\nTraining Accuracy: {train_score:.4f}")
+print(f"Test Accuracy: {test_score:.4f}")
+
+# Log metrics manual (autolog sudah handle ini, tapi tambahkan untuk kepastian)
+mlflow.log_metric("train_accuracy", train_score)
+mlflow.log_metric("test_accuracy", test_score)
+mlflow.log_param("n_features", len(feature_columns))
+mlflow.log_param("n_train_samples", X_train.shape[0])
+mlflow.log_param("n_test_samples", X_test.shape[0])
+
+print("\n" + "="*50)
+print("MLflow Autolog Training Complete!")
+print("="*50)
+print("\nSemua parameter, metrik, dan model telah disimpan ke MLflow.")
