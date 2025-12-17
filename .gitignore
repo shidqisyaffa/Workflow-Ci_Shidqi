@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+.venv/
+
+# MLflow artifacts (generated during training)
+mlruns/
+MLProject/mlruns/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+.DS_Store
+Thumbs.db
