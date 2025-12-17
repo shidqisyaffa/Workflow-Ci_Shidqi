@@ -46,16 +46,18 @@ jobs:
       # Tahap 6: Set MLflow Tracking URI
       - name: Set MLflow Tracking URI
         run: |
-          mkdir -p mlruns
-          echo "MLFLOW_TRACKING_URI=file://$(pwd)/mlruns" >> $GITHUB_ENV
-          echo "MLflow Tracking URI set to: file://$(pwd)/mlruns"
+          mkdir -p ${{ github.workspace }}/mlruns
+          echo "MLFLOW_TRACKING_URI=${{ github.workspace }}/mlruns" >> $GITHUB_ENV
+          echo "MLflow Tracking URI set to: ${{ github.workspace }}/mlruns"
       
       # Tahap 7: Run MLflow Project
       - name: Run MLflow Project
+        working-directory: MLProject
+        env:
+          MLFLOW_TRACKING_URI: ${{ github.workspace }}/mlruns
         run: |
           echo "=== Starting MLflow Project Training ==="
-          cd MLProject
-          mlflow run . --env-manager=local
+          python modelling.py
           echo "=== MLflow Project Training Complete ==="
       
       # Tahap 8: Get latest MLflow run_id
@@ -63,26 +65,26 @@ jobs:
         id: mlflow_run
         run: |
           echo "=== Finding Latest MLflow Run ==="
-          # Find the experiment directory
-          EXPERIMENT_DIR=$(find . -path "*/mlruns/0" -type d 2>/dev/null | head -n 1)
-          if [ -z "$EXPERIMENT_DIR" ]; then
-            EXPERIMENT_DIR="./MLProject/mlruns/0"
-          fi
-          echo "Experiment directory: $EXPERIMENT_DIR"
+          echo "Looking in: ${{ github.workspace }}/mlruns"
+          ls -la ${{ github.workspace }}/mlruns/ || echo "mlruns not found"
           
-          # Get the latest run_id
-          if [ -d "$EXPERIMENT_DIR" ]; then
-            RUN_ID=$(ls -t "$EXPERIMENT_DIR" 2>/dev/null | grep -v meta.yaml | head -n 1)
-            echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
-            echo "Latest run_id: $RUN_ID"
+          # Find experiment directories
+          if [ -d "${{ github.workspace }}/mlruns" ]; then
+            EXPERIMENT_ID=$(ls ${{ github.workspace }}/mlruns/ | grep -v "\.trash" | head -n 1)
+            echo "Experiment ID: $EXPERIMENT_ID"
+            
+            if [ -n "$EXPERIMENT_ID" ] && [ -d "${{ github.workspace }}/mlruns/$EXPERIMENT_ID" ]; then
+              RUN_ID=$(ls -t "${{ github.workspace }}/mlruns/$EXPERIMENT_ID" 2>/dev/null | grep -v meta.yaml | head -n 1)
+              echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+              echo "Latest run_id: $RUN_ID"
+            fi
           else
-            echo "No mlruns directory found, creating placeholder"
+            echo "No mlruns directory found"
             echo "run_id=no-run-found" >> $GITHUB_OUTPUT
           fi
           
-          # Show mlruns structure
           echo "=== MLruns Structure ==="
-          find . -name "mlruns" -type d -exec ls -la {} \; 2>/dev/null || echo "No mlruns found"
+          find ${{ github.workspace }}/mlruns -type d -maxdepth 2 2>/dev/null || echo "No structure found"
       
       # Tahap 9: Install additional Python dependencies (verification)
       - name: Verify Python dependencies
@@ -95,9 +97,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mlflow-model-${{ github.run_number }}
-          path: |
-            MLProject/mlruns/
-            mlruns/
+          path: ${{ github.workspace }}/mlruns/
           retention-days: 30
           if-no-files-found: warn
 
